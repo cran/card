@@ -4,28 +4,20 @@
 \name{card-package}
 \alias{card}
 \alias{card-package}
-\title{card: Cardiovascular and Autonomic Research Design}
+\title{card: Cardiovascular Applications in Research Data}
 \description{
-Tools that can aid in the assessment of the autonomic regulation 
-		of cardiovascular physiology. The aims of this package are to: 1) study 
-		electrocardiography (both intervals and morphology) as extensions 
-		of signal processing, 2) study circadian rhythms and how it effects 
-		autonomic physiology, 3) assess clinical risk of autonomic dysfunction on 
-		cardiovascular health through the perspective of epidemiology and causality.
-		The analysis of circadian rhythms through cosinor analysis are built upon 
-		the methods by Cornelissen (2014) <doi:10.1186/1742-4682-11-16> and 
-		Refinetti, Cornelissen, Halberg (2014) <doi:10.1080/09291010600903692>.
+A collection of cardiovascular research datasets and analytical tools, including methods for cardiovascular procedural data, such as electrocardiography, echocardiography, and catheterization data. Additional methods exist for analysis of procedural billing codes.
 }
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/asshah4/card}
-  \item Report bugs at \url{https://github.com/asshah4/card/issues}
+  \item \url{https://cran.r-project.org/package=card}
+  \item Report bugs at \url{https://github.com/shah-in-boots/card/issues}
 }
 
 }
 \author{
-\strong{Maintainer}: Anish S. Shah \email{asshah4@emory.edu} (\href{https://orcid.org/0000-0002-9729-1558}{ORCID}) [copyright holder]
+\strong{Maintainer}: Anish S. Shah \email{shah.in.boots@gmail.com} (\href{https://orcid.org/0000-0002-9729-1558}{ORCID}) [copyright holder]
 
 }
 \keyword{internal}

@@ -1,4 +1,4 @@
-# Recurrent Event Sample Data {{{ ====
+# Recurrent Event Sample Data ====
 
 #' Recurrent event sample data
 #'
@@ -10,9 +10,7 @@
 #' @docType data
 #' @format An tibble data frame
 #' @keywords datasets
-"mims"
-
-# }}}
+"stress"
 
 # Clinical Variables and Dyx Hourly Data {{{ ====
 
@@ -25,22 +23,18 @@
 #' @keywords datasets
 "twins"
 
-# }}}
-
-# Clinical Variables and Dyx Hourly Data {{{ ====
+# Clinical Variables and Dyx Hourly Data ====
 
 #' Hourly time series data with clinical covariates
 #'
 #' Clinical data is also available for visualization and comparison. Other HRV measures are used here for comparison and testing out functions.
 #'
 #' @docType data
-#' @format An tibble data frame
+#' @format A `tbl_df`
 #' @keywords datasets
 "triplets"
 
-# }}}
-
-# Global Electrical Heterogeneity Data {{{ ====
+# Global Electrical Heterogeneity Data ====
 
 #' GEH parameters in a large clinical cohort
 #'
@@ -51,9 +45,7 @@
 #' @keywords datasets
 "geh"
 
-# }}}
-
-# Output from MATLAB HRV Toolbox {{{ ====
+# Output from MATLAB HRV Toolbox ====
 
 #' Output from MATLAB HRV Toolbox
 #'
@@ -64,17 +56,13 @@
 #' @keywords datasets
 "hrv"
 
-# }}}
-
-# Zipcodes with Associated Latitude and Longitude {{{ ====
+# Zipcodes with Associated Latitude and Longitude ====
 
 #' Zipcodes with Associated Latitude and Longitude
 #'
-#' This is a dataset from the archived/orphaned {zipcode} package.
+#' This is a dataset from the archived/orphaned `zipcode` package.
 #'
 #' @docType data
 #' @format A data frame with character vector zipcodes and latitude/longitude
 #' @keywords datasets
 "zipcode"
-
-# }}}

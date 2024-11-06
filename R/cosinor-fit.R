@@ -1,8 +1,10 @@
-# Cosinor Implementation {{{ ====
+# Cosinor Implementation ----
 
 ## Single Component Cosinor Implementation
 
-#' @description Model fitting algorithm for cosinor. Results in output that define the new S3 class, as seen by the [hardhat::new_model], which generates the `new_cosinor` function.
+#' @description Model fitting algorithm for cosinor. Results in output that
+#'   define the new S3 class, as seen by the [hardhat::new_model], which
+#'   generates the `new_cosinor()` function.
 #' @noRd
 cosinor_impl <- function(predictors, outcomes, tau) {
 
@@ -33,8 +35,19 @@ cosinor_impl <- function(predictors, outcomes, tau) {
   # y(t) = M + sum_j[beta_j * x_j + gamma_j * z_j] + error(t)
 
   # Number of parameters will be the number of taus
-    # e.g. single component = 3 components, where 3 = 2p + 1 (p = 1 component)
+  # 	e.g. single component = 3 components, where 3 = 2p + 1 (p = 1 component)
   p <- length(tau)
+
+  # Create null variables
+  mesor <- NULL
+  for (i in 1:p) {
+    assign(paste0("x", i), NULL)
+    assign(paste0("z", i), NULL)
+    assign(paste("amp", i), NULL)
+    assign(paste("phi", i), NULL)
+    assign(paste("beta", i), NULL)
+    assign(paste("gamma", i), NULL)
+  }
 
   # Single parameters
   y <- outcomes
@@ -42,17 +55,17 @@ cosinor_impl <- function(predictors, outcomes, tau) {
   n  <- length(t)
 
   # Normal equation for 3 components
-    # Normal equations (where M, beta, gamma are the coefficients to solve for)
-    # sum(y) = M*n + beta*sum(x) + gamma*sum(z)
-    # sum(y*x) = M*sum(x) + beta*sum(x^2) + gamma*sum(x*z)
-    # sum(y*z) = M*sum(z) + beta*sum(x*z) + gamma*sum(z^2)
-    # d = Su (for single component, 3 equations with 3 unknowns)
+  # 	Normal equations (where M, beta, gamma are the coefficients to solve for)
+  # 	sum(y) = M*n + beta*sum(x) + gamma*sum(z)
+  # 	sum(y*x) = M*sum(x) + beta*sum(x^2) + gamma*sum(x*z)
+  # 	sum(y*z) = M*sum(z) + beta*sum(x*z) + gamma*sum(z^2)
+  # 	d = Su (for single component, 3 equations with 3 unknowns)
 
   # For multiple components, the matrix must be expanded
 
   # Need to create number of x values to match number of taus
   # x1, x2, z1, z2 in this case
-  for(i in 1:p) {
+  for (i in 1:p) {
     assign(paste0("x", i), cos((2 * pi * t) / tau[i]))
     assign(paste0("z", i), sin((2 * pi * t) / tau[i]))
   }
@@ -77,7 +90,7 @@ cosinor_impl <- function(predictors, outcomes, tau) {
   coefs <- solve(t(xmat) %*% xmat) %*% t(xmat) %*% ymat
   mesor <- coefs[1]
 
-  for(i in 1:p) {
+  for (i in 1:p) {
 
     # Beta and gamma terms
     assign(paste0("beta", i), unname(coefs[paste0("x", i),]))
@@ -111,7 +124,7 @@ cosinor_impl <- function(predictors, outcomes, tau) {
 	  # y(t) = M + amp1 * cos(2*pi*t/tau1 + phi1) + amp2 * cos(2*pi*t/tau2 + phi2)
 
   pars <- list()
-  for(i in 1:p) {
+  for (i in 1:p) {
 		pars[[i]] <- get(paste0("amp", i)) * cos(2*pi*t / tau[i] + get(paste0("phi", i)))
   }
   df <- data.frame(mesor = mesor, matrix(unlist(pars), ncol = length(pars), byrow = FALSE))
@@ -160,16 +173,27 @@ cosinor_pop_impl <- function(predictors, outcomes, tau, population) {
   # Period
   p <- length(tau) # Number of parameters ... single cosinor ~ 2p + 1 = 3
 
+  # Create null variables based on number of parameters
+  mesor <- NULL
+  for (i in 1:p) {
+    assign(paste0("x", i), NULL)
+    assign(paste0("z", i), NULL)
+    assign(paste("amp", i), NULL)
+    assign(paste("phi", i), NULL)
+    assign(paste("beta", i), NULL)
+    assign(paste("gamma", i), NULL)
+  }
+
   # Create data frame for split/apply approach
-  df <- data.frame(predictors, outcomes, population)
+  df <- stats::na.omit(data.frame(predictors, outcomes, population))
 
   # Remove patients with only p observations (will cause a det ~ 0 error)
   counts <- by(df, df[, "population"], nrow)
-  lowCounts <- as.numeric(names(counts[counts <= 2*p + 1]))
+  lowCounts <- as.numeric(names(counts[counts <= 2 * p + 1]))
   df <- subset(df, !(population %in% lowCounts))
 
   # Message about population count removal
-  if(length(lowCounts) != 0) {
+  if (length(lowCounts) != 0) {
     message(length(lowCounts), " subjects were removed due to having insufficient observations.")
   }
 
@@ -182,7 +206,7 @@ cosinor_pop_impl <- function(predictors, outcomes, tau, population) {
 
   # Need to create number of x values to match number of taus
   # x1, x2, z1, z2 in this case
-  for(i in 1:p) {
+  for (i in 1:p) {
     assign(paste0("x", i), cos((2 * pi * t) / tau[i]))
     assign(paste0("z", i), sin((2 * pi * t) / tau[i]))
   }
@@ -193,42 +217,50 @@ cosinor_pop_impl <- function(predictors, outcomes, tau, population) {
   # Create matrix that we can apply cosinor to subgroups
   kCosinors <- with(
     df,
-    by(df, population, function(x) {
-      cosinor_impl(x$predictors, x$outcomes, tau)
+    by(df, population, function(.x) {
+      cosinor_impl(.x$predictors, .x$outcomes, tau)
     })
   )
 
   ### Coefficients
 
   # Fits of individual cosinors
-  kfits <- sapply(kCosinors, stats::fitted)
+  # Must be a data frame to have column names
+  kfits <- sapply(kCosinors, stats::fitted, USE.NAMES = TRUE)
+  if (inherits(kfits, "matrix")) {
+  	kfits <- as.data.frame(kfits)
+  }
   fits <- data.frame(
     population = rep(names(kfits), sapply(kfits, length)),
     yhat = unlist(kfits)
   )
 
-  # Matrix of coefficients
+  # Coefficient table
   tbl <- sapply(kCosinors, stats::coef, USE.NAMES = TRUE)
   coef_names <- c("mesor", paste0("amp", 1:p), paste0("phi", 1:p), paste0("beta", 1:p), paste0("gamma", 1:p))
   rownames(tbl) <- coef_names
   xmat <- t(tbl)
 
-  # Get mean for each parameter (mesor, beta, gamma), ignoring averaged amp/phi
+  # Get mean for each parameter (mesor, beta, gamma)
+  # Will need to recalculate the valvues for amplitude & acrophase
+  # Creates a vector of values we can overwrite
   coefs <- colMeans(xmat, na.rm = TRUE)
 
-  for(i in 1:p) {
+  for (i in 1:p) {
 
-    # Beta and gamma terms
-    assign(paste0("beta", i), unname(coefs[paste0("beta", i)]))
-    assign(paste0("gamma", i), unname(coefs[paste0("gamma", i)]))
+  	# Get the beta and gamma parameter names from the table
+  	# Calculate the mean of each
+  	beta <- mean(xmat[, paste0("beta", i)], na.rm = TRUE)
+  	gamma <- mean(xmat[, paste0("gamma", i)], na.rm = TRUE)
 
-    # Amplitude
-    assign(paste0("amp", i), sqrt(get(paste0("beta", i))^2 + get(paste0("gamma", i))^2))
+  	# Calculate population amplitude
+  	# Uses trigonometric approach
+  	amp <- sqrt(beta^2 + gamma^2)
 
-    # Phi / acrophase
-    sb <- sign(get(paste0("beta", i)))
-    sg <- sign(get(paste0("gamma", i)))
-    theta <- atan(abs(get(paste0("gamma", i)) / get(paste0("beta", i))))
+  	# Acrophase = phi, calculated with the arctangent
+    sb <- sign(beta)
+    sg <- sign(gamma)
+    theta <- atan(abs(gamma / beta))
 
     if ((sb == 1 | sb == 0) & sg == 1) {
       phi <- -theta
@@ -240,11 +272,10 @@ cosinor_pop_impl <- function(predictors, outcomes, tau, population) {
       phi <- theta - (2 * pi)
     }
 
-    assign(paste0("phi", i), phi)
-
     # Final coefs
-    coefs[paste0("amp", i)] <- get(paste0("amp", i))
-    coefs[paste0("phi", i)] <- get(paste0("phi", i))
+    # Assign terms for final coefs
+    coefs[paste0("amp", i)] <- amp
+    coefs[paste0("phi", i)] <- phi
 
   }
 
@@ -279,9 +310,7 @@ cosinor_pop_impl <- function(predictors, outcomes, tau, population) {
 
 }
 
-# }}}
-
-# Statistical Methods {{{ ====
+# Statistical Methods ----
 
 ## Confidence Intervals
 
@@ -303,7 +332,18 @@ confint.cosinor <- function(object, parm, level = 0.95, ...) {
 	n <- length(t)
 	p <- length(object$tau)
 
-  for(i in 1:p) {
+  # Create null variables
+  mesor <- NULL
+  for (i in 1:p) {
+    assign(paste0("x", i), NULL)
+    assign(paste0("z", i), NULL)
+    assign(paste("amp", i), NULL)
+    assign(paste("phi", i), NULL)
+    assign(paste("beta", i), NULL)
+    assign(paste("gamma", i), NULL)
+  }
+
+  for (i in 1:p) {
     assign(paste0("x", i), object$model[, paste0("x", i)])
     assign(paste0("z", i), object$model[, paste0("z", i)])
   }
@@ -312,80 +352,152 @@ confint.cosinor <- function(object, parm, level = 0.95, ...) {
 	yhat <- object$fitted.values
 	coefs <- object$coefficients
 	names(coefs) <- object$coef_names
-  for(i in 1:length(coefs)) {
+  for (i in 1:length(coefs)) {
     assign(names(coefs)[i], unname(coefs[i]))
 	}
 
 	switch(
-	  object$type,
-	  Population = {
-  		# Message
-  		message("Confidence intervals for amplitude and acrophase for population-mean cosinor use the methods described by Fernando et al 2004, which may not be applicable to multiple-components.")
+		object$type,
+		Population = {
+			# Message
+			message("Confidence intervals for amplitude and acrophase for population-mean cosinor use the methods described by Fernandez et al. 2004.")
 
-  		# Freedom by number of individuals
-  		k <- nrow(object$xmat)
+			# Number of individuals
+			k <- nrow(xmat)
 
-  		# Standard errors
-  	  SE_mesor <- sd(xmat[, "mesor"]) / sqrt(k)
-  		for(i in 1:p) {
-  		  assign(paste0("SE_amp", i), (sd(xmat[, paste0("amp", i)]) / sqrt(k)))
-  		  assign(paste0("SE_phi", i), (sd(xmat[, paste0("phi", i)]) / sqrt(k)))
-  		  assign(paste0("SE_beta", i), (sd(xmat[, paste0("beta", i)]) / sqrt(k)))
-  		  assign(paste0("SE_gamma", i), (sd(xmat[, paste0("gamma", i)]) / sqrt(k)))
-  		}
+			varCovMat <- stats::cov(xmat)
 
-  	  # Save SE
-  	  se <- list()
-      for(i in 1:p) {
-        se[[i]] <- c(
-          paste0("SE_amp", i),
-          paste0("SE_phi", i),
-          paste0("SE_beta", i),
-          paste0("SE_gamma", i)
-        )
-      }
-  	  se <- c(SE_mesor, unlist(mget(unlist(se))))
-  	  names(se)[1] <- "SE_mesor"
-  	  names(se) <- gsub("SE_", "", names(se))
+			# Degrees of freedom
+			degreesFreedom <- k - 1
 
-  	  # Confidence intervals
-  	  tdist <- stats::qt(1 - a/2, df = n - k)
-  	  confints <- list()
-  	  for(i in 1:p) {
-  	    confints[[i]] <-
-  	      c(
-  	        # Amp
-    	      get(paste0("amp", i)) - tdist * get(paste0("SE_amp", i)),
-    	      get(paste0("amp", i)) + tdist * get(paste0("SE_amp", i)),
-    	      # Phi
-    	      get(paste0("phi", i)) - tdist * get(paste0("SE_phi", i)),
-    	      get(paste0("phi", i)) + tdist * get(paste0("SE_phi", i))
-  	    )
-  	  }
+			# Initialize data structures for output
+			ciMatrix <- matrix(nrow = 0, ncol = 2)
+			colnames(ciMatrix) <- c(
+				sprintf("%.1f%%", a / 2 * 100),
+				sprintf("%.1f%%", (1 - a / 2) * 100)
+			)
 
-      df <- rbind(
-        c(mesor - tdist*SE_mesor, mesor + tdist*SE_mesor),
-        matrix(unlist(confints), ncol = 2, byrow = TRUE)
-      )
-      rnames <- list()
-      for(i in 1:p) {
-        rnames[[i]] <- c(paste0("amp", i), paste0("phi", i))
-      }
-      rownames(df) <- c("mesor", unlist(rnames))
-      colnames(df) <- c(paste0(100*(a/2),"%"), paste0(100*(1-a/2), "%"))
+			seVector <- numeric()
+			names(seVector) <- character()
 
-  	  # Returned
-      estimates <- list(
-        ci = df,
-        se = se
-      )
-      return(estimates)
+			# MESOR confidence interval
+			seMesor <- sqrt(varCovMat["mesor", "mesor"] / k)
+			tValue <- stats::qt(1 - a / 2, degreesFreedom)
+			ciMesor <- c(
+				coefs["mesor"] - tValue * seMesor,
+				coefs["mesor"] + tValue * seMesor
+			)
 
-	  },
+			# Add MESOR to outputs
+			ciMatrix <- rbind(ciMatrix, ciMesor)
+			rownames(ciMatrix)[nrow(ciMatrix)] <- "mesor"
+
+			seVector <- c(seVector, seMesor)
+			names(seVector)[length(seVector)] <- "mesor"
+
+			# For each component
+			for (i in 1:p) {
+
+				# Get the beta and gamma values from the parameters
+				betaVal <- xmat[, paste0("beta", i)]
+				gammaVal <- xmat[, paste0("gamma", i)]
+
+				# Compute sample means
+				betaBar <- mean(betaVal)
+				gammaBar <- mean(gammaVal)
+
+				# Compute covariance matrix for beta and gamma
+				covMat <- stats::cov(cbind(betaVal, gammaVal))
+
+				# Compute standard errors for beta and gamma
+				betaSE <- sqrt(stats::var(betaVal) / k)
+				gammaSE <- sqrt(stats::var(gammaVal) / k)
+
+				# Compute t-value for beta and gamma
+				tValueBetaGamma <- stats::qt(1 - a / 2, degreesFreedom)
+
+				# Confidence intervals for beta and gamma
+				betaLower <- betaBar - tValueBetaGamma * betaSE
+				betaUpper <- betaBar + tValueBetaGamma * betaSE
+
+				gammaLower <- gammaBar - tValueBetaGamma * gammaSE
+				gammaUpper <- gammaBar + tValueBetaGamma * gammaSE
+
+				# Add beta to outputs
+				ciMatrix <- rbind(ciMatrix, c(betaLower, betaUpper))
+				rownames(ciMatrix)[nrow(ciMatrix)] <- paste0("beta", i)
+
+				seVector <- c(seVector, betaSE)
+				names(seVector)[length(seVector)] <- paste0("beta", i)
+
+				# Add gamma to outputs
+				ciMatrix <- rbind(ciMatrix, c(gammaLower, gammaUpper))
+				rownames(ciMatrix)[nrow(ciMatrix)] <- paste0("gamma", i)
+
+				seVector <- c(seVector, gammaSE)
+				names(seVector)[length(seVector)] <- paste0("gamma", i)
+
+				# Delta method for confidence intervals
+				# Start with amplitude
+				dAmpBeta <- coefs[[paste0("beta", i)]] / coefs[[paste0("amp", i)]]
+				dAmpGamma <- coefs[[paste0("gamma", i)]] / coefs[[paste0("amp", i)]]
+				ampVar <-
+					dAmpBeta ^ 2 * varCovMat[paste0("beta", i), paste0("beta", i)] +
+					2 * dAmpBeta * dAmpGamma * varCovMat[paste0("beta", i), paste0("gamma", i)] +
+					dAmpGamma ^ 2 * varCovMat[paste0("gamma", i), paste0("gamma", i)]
+				ampSE <- sqrt(ampVar)
+
+				# Calculate acrophase SE using delta method as well
+				denom <- coefs[[paste0("beta", i)]]^2 + coefs[[paste0("gamma", i)]]^2
+				dPhiBeta <- coefs[[paste0("gamma", i)]] / denom
+				dPhiGamma <- -coefs[[paste0("beta", i)]] / denom
+				phiVar <-
+					dPhiBeta ^ 2 * varCovMat[paste0("beta", i), paste0("beta", i)] +
+					2 * dPhiBeta * dPhiGamma * varCovMat[paste0("beta", i), paste0("gamma", i)] +
+					dPhiGamma ^ 2 * varCovMat[paste0("gamma", i), paste0("gamma", i)]
+				phiSE <- sqrt(phiVar)
+
+				# Calculate confidence intervals
+				zCrit <- stats::qnorm(1 - a / 2)
+
+				# Confidence intervals for amplitude
+				ampLower <- coefs[[paste0("amp", i)]] - zCrit * ampSE
+				ampUpper <- coefs[[paste0("amp", i)]] + zCrit * ampSE
+
+				# Confidence intervals for acrophase
+				# This requires making sure within the radian circle however
+				phiLower <- coefs[[paste0("phi", i)]] - zCrit * phiSE
+				phiUpper <- coefs[[paste0("phi", i)]] + zCrit * phiSE
+
+				# Add amplitude to outputs
+				ciMatrix <- rbind(ciMatrix, c(ampLower, ampUpper))
+				rownames(ciMatrix)[nrow(ciMatrix)] <- paste0("amp", i)
+
+				# Standard error for amplitude
+				seVector <- c(seVector, ampSE)
+				names(seVector)[length(seVector)] <- paste0("amp", i)
+
+				# Add acrophase to outputs
+				ciMatrix <- rbind(ciMatrix, c(phiLower, phiUpper))
+				rownames(ciMatrix)[nrow(ciMatrix)] <- paste0("phi", i)
+
+				seVector <- c(seVector, phiSE)
+				names(seVector)[length(seVector)] <- paste0("phi", i)
+			}
+
+			# Name the columns of ciMatrix according to confidence levels
+			colnames(ciMatrix) <- c(
+				sprintf("%.1f%%", a / 2 * 100),
+				sprintf("%.1f%%", (1 - a / 2) * 100)
+			)
+
+			# Return the output as a list
+			return(list(ci = ciMatrix, se = seVector))
+		},
 	  Individual = {
 
   		# Nummber of parameters
-  		k <- 2*p + 1
+  		k <- 2 * p + 1
 
   	  # Matrix to get standard errors and confidence intervals
     	xmat <- t(object$xmat) %*% object$xmat
@@ -469,6 +581,9 @@ confint.cosinor <- function(object, parm, level = 0.95, ...) {
 
 }
 
+
+
+
 ## Zero Amplitude Test
 
 #' @title Zero Amplitude Test
@@ -481,11 +596,23 @@ confint.cosinor <- function(object, parm, level = 0.95, ...) {
 #' @export
 cosinor_zero_amplitude <- function(object, level = 0.95) {
 
-	if(object$type == "Population") {
+	if (object$type == "Population") {
 		message("Zero amplitude test may not be accurate for population-mean cosinor method.")
 	}
 
 	### Confidence level of fstatistic
+
+  # Create null variables
+	p <- length(object$tau)
+  mesor <- NULL
+  for (i in 1:p) {
+    assign(paste0("x", i), NULL)
+    assign(paste0("z", i), NULL)
+    assign(paste("amp", i), NULL)
+    assign(paste("phi", i), NULL)
+    assign(paste("beta", i), NULL)
+    assign(paste("gamma", i), NULL)
+  }
 
 	# Model objects
 	y <- object$model[, "y"]
@@ -542,7 +669,7 @@ cosinor_zero_amplitude <- function(object, level = 0.95) {
 #' @export
 cosinor_goodness_of_fit <- function(object, level = 0.95, ...) {
 
-	if(object$type == "Population") {
+	if (object$type == "Population") {
 		message("Goodness of fit may not be accurate for population-mean cosinor method.")
 	}
 
@@ -555,7 +682,19 @@ cosinor_goodness_of_fit <- function(object, level = 0.95, ...) {
 	n <- length(t)
 	p <- length(object$tau)
 
-  for(i in 1:p) {
+  # Create null variables
+  mesor <- NULL
+  for (i in 1:p) {
+    assign(paste0("x", i), NULL)
+    assign(paste0("z", i), NULL)
+    assign(paste("amp", i), NULL)
+    assign(paste("phi", i), NULL)
+    assign(paste("beta", i), NULL)
+    assign(paste("gamma", i), NULL)
+  }
+
+
+  for (i in 1:p) {
     assign(paste0("x", i), object$model[, paste0("x", i)])
     assign(paste0("z", i), object$model[, paste0("z", i)])
   }
@@ -564,7 +703,7 @@ cosinor_goodness_of_fit <- function(object, level = 0.95, ...) {
 	yhat <- object$fitted.values
 	coefs <- object$coefficients
 	names(coefs) <- object$coef_names
-  for(i in 1:length(coefs)) {
+  for (i in 1:length(coefs)) {
     assign(names(coefs)[i], unname(coefs[i]))
 	}
 
@@ -592,7 +731,7 @@ cosinor_goodness_of_fit <- function(object, level = 0.95, ...) {
   # SSPE = sum(observed value at t - local average at t)^2
   df <- data.frame(y, t)
   SSPE <- vector()
-  for(l in seq_along(ybar$t)) {
+  for (l in seq_along(ybar$t)) {
     yl <- df$y[df$t == ybar$t[l]]
     ybarl <- ybar$ybar[ybar$t == ybar$t[l]]
     SSPE[l] <- sum((yl - ybarl)^2)
@@ -632,10 +771,10 @@ cosinor_goodness_of_fit <- function(object, level = 0.95, ...) {
 #' @export
 cosinor_area <- function(object, level = 0.95, ...) {
 
-	if(object$type == "Population") {
+	if (object$type == "Population") {
 		message("Area calculations may not be accurate for population-mean cosinor method.")
 	}
-  if(length(object$tau) > 1) {
+  if (length(object$tau) > 1) {
     message("Area calculations currently use only the principal amplitude and acrophase in multiple-component cosinor method.")
   }
 
@@ -648,7 +787,19 @@ cosinor_area <- function(object, level = 0.95, ...) {
 	n <- length(t)
 	p <- length(object$tau)
 
-  for(i in 1:p) {
+  # Create null variables
+  mesor <- NULL
+  for (i in 1:p) {
+    assign(paste0("x", i), NULL)
+    assign(paste0("z", i), NULL)
+    assign(paste("amp", i), NULL)
+    assign(paste("phi", i), NULL)
+    assign(paste("beta", i), NULL)
+    assign(paste("gamma", i), NULL)
+  }
+  x1 <- z1 <- beta1 <- gamma1 <- amp1 <- phi1 <- NULL
+
+  for (i in 1:p) {
     assign(paste0("x", i), object$model[, paste0("x", i)])
     assign(paste0("z", i), object$model[, paste0("z", i)])
   }
@@ -657,12 +808,12 @@ cosinor_area <- function(object, level = 0.95, ...) {
 	yhat <- object$fitted.values
 	coefs <- object$coefficients
 	names(coefs) <- object$coef_names
-  for(i in 1:length(coefs)) {
+  for (i in 1:length(coefs)) {
     assign(names(coefs)[i], unname(coefs[i]))
 	}
 
   # Stats
-  k <- 2*p + 1 # number of parameters
+	k <- 2 * p + 1 # number of parameters
   RSS <- sum((y - yhat)^2)
   sigma <- sqrt(RSS / (n - k))
   fdist <- stats::qf(1 - a, df1 = k - 1, df2 = n - k)
@@ -759,7 +910,14 @@ cosinor_area <- function(object, level = 0.95, ...) {
 ## Multiple Component Cosinor Features
 
 #' @title Multiple Component Cosinor Features
-#' @description Extract the special/global features of a multiple component cosinor. In a multiple component model, there are specific parameters that are not within the model itself, but must be extracted from the model fit. When extracted, can be used to improve the plot of a multiple component cosinor. However, this is only possible if the cosinor is harmonic (see `details`). For single-component models, the orthophase is the same as the acrophase and the global amplitude
+#'
+#' @description Extract the special/global features of a multiple component
+#'   cosinor. In a multiple component model, there are specific parameters that
+#'   are not within the model itself, but must be extracted from the model fit.
+#'   When extracted, can be used to improve the plot of a multiple component
+#'   cosinor. However, this is only possible if the cosinor is harmonic (see
+#'   `details`). For single-component models, the orthophase is the same as the
+#'   acrophase and the global amplitude
 #'
 #'   * Global Amplitude (Ag) = the overall amplitude is defined as half the difference between the peak and trough values
 #'
@@ -767,28 +925,56 @@ cosinor_area <- function(object, level = 0.95, ...) {
 #'
 #'   * Bathyphase (Pb) =  the lag until the trough time
 #'
-#' @details These calculations can only occur if the periods of the cosinor are harmonic - as in, the longest period is a integer multiple of the smallest period (known as the fundamental frequency). Otherwise, these statistics are not accurate or interpretable.
+#' @details These calculations can only occur if the periods of the cosinor are
+#'   harmonic - as in, the longest period is a integer multiple of the smallest
+#'   period (known as the fundamental frequency). Otherwise, these statistics
+#'   are not accurate or interpretable.
+#'
 #' @param object Model of class `cosinor` with multiple periods
-#' @param population If the object is a population cosinor, should the features be calculated for the individual cosinors or for the population-cosinors. Default is TRUE. This has no effect on "Individual" cosinor objects.
+#'
+#' @param population If the object is a population cosinor, should the features
+#'   be calculated for the individual cosinors or for the population-cosinors.
+#'   Default is TRUE. This has no effect on "Individual" cosinor objects.
 #'
 #'    * If TRUE, then will calculate features for entire population.
 #'
 #'    * If FALSE, then will calculate features for every individual cosinor in the population.
+#'
 #' @param ... For extensibility
-#' @return When returning the cosinor features for a single model, will return an object of class `list`. When returning the cosinor features for every individual in a population cosinor, will return an object of class `tibble`.
+#'
+#' @return When returning the cosinor features for a single model, will return
+#'   an object of class `list`. When returning the cosinor features for every
+#'   individual in a population cosinor, will return an object of class
+#'   `tibble`.
+#'
 #' @examples
 #' data(twins)
 #' model <- cosinor(rDYX ~ hour, twins, c(24, 8), "patid")
 #' results <- cosinor_features(model, population = FALSE)
 #' head(results)
+#'
 #' @export
 cosinor_features <- function(object, population = TRUE, ...) {
 
-	# Is multiple component and harmonic?
+	# Object components
 	tau <- object$tau
 	p <- length(tau)
+
+  # Create null variables
+  mesor <- NULL
+  for (i in 1:p) {
+    assign(paste0("x", i), NULL)
+    assign(paste0("z", i), NULL)
+    assign(paste("amp", i), NULL)
+    assign(paste("phi", i), NULL)
+    assign(paste("beta", i), NULL)
+    assign(paste("gamma", i), NULL)
+  }
+  models <- NULL
+
+	# Is multiple component and harmonic?
 	harmonic <- ifelse(length(tau) > 1 & max(tau) %% min(tau) == 0, TRUE, FALSE)
-	if(harmonic) {
+	if (harmonic) {
 		message("This is a harmonic multiple-component cosinor object. The orthophase, bathyphase, and global amplitude were calculated.")
 	}
 
@@ -859,9 +1045,9 @@ cosinor_features <- function(object, population = TRUE, ...) {
 
 		# Fits are based on individuals, already made from original pop-cosinor
 		results <-
-			aug %>%
-			tidyr::nest(models = -population) %>%
-			dplyr::mutate(purrr::map_df(models, features)) %>%
+			aug |>
+			tidyr::nest(models = -population) |>
+			dplyr::mutate(purrr::map_df(models, features)) |>
 			dplyr::select(-models)
 
 	}
@@ -870,5 +1056,3 @@ cosinor_features <- function(object, population = TRUE, ...) {
 	return(results)
 
 }
-
-# }}}
